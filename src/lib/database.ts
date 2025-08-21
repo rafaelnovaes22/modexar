@@ -1,5 +1,8 @@
 import { Pool } from 'pg';
 
+// Define um tipo para os valores que podem ser passados em uma consulta parametrizada.
+type QueryValues = (string | number | boolean | null)[];
+
 // Cria um novo pool de conexões. O pool irá ler as variáveis de ambiente
 // (PGHOST, PGUSER, PGDATABASE, PGPASSWORD, PGPORT) ou a variável POSTGRES_URL.
 const pool = new Pool({
@@ -10,7 +13,7 @@ const pool = new Pool({
 });
 
 // Função para executar consultas SQL.
-export async function query(text: string, params?: any[]) {
+export async function query(text: string, params?: QueryValues) {
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
