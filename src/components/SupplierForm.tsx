@@ -41,9 +41,13 @@ export default function SupplierForm() {
       formRef.current?.reset();
       closeModal();
 
-    } catch (err: any) {
+    } catch (err) {
       console.error('Falha ao adicionar fornecedor:', err);
-      setError(err.message || 'Não foi possível adicionar o fornecedor. Tente novamente.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Não foi possível adicionar o fornecedor. Tente novamente.');
+      }
     }
   }
 

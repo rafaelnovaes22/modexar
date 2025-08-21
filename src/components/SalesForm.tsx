@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from 'react';
 
-
+interface Product {
+  id: string;
+  nome: string;
+  estoque: number;
+}
 
 export default function SalesForm() {
   const [produtoId, setProdutoId] = useState('');
   const [quantidade, setQuantidade] = useState('');
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     const fetchProducts = async () => {

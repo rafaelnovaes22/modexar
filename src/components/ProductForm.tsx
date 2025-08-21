@@ -43,9 +43,13 @@ export default function ProductForm({ suppliers }: { suppliers: Fornecedor[] }) 
       formRef.current?.reset();
       closeModal();
 
-    } catch (err: any) {
+    } catch (err) {
       console.error('Falha ao adicionar produto:', err);
-      setError(err.message || 'Não foi possível adicionar o produto. Tente novamente.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Não foi possível adicionar o produto. Tente novamente.');
+      }
     }
   }
 

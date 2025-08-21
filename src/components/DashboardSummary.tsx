@@ -2,8 +2,26 @@
 
 import { useEffect, useState } from 'react';
 
+// Definindo uma interface para a estrutura dos dados do dashboard
+interface DashboardData {
+  totalSuppliers: number;
+  totalProducts: number;
+  totalOrders: number;
+  pendingOrders: number;
+  totalRevenue: number;
+  totalCosts: number;
+  totalProfit: number;
+  lowStockProducts: Product[];
+}
+
+interface Product {
+  id: string;
+  nome: string;
+  estoque: number;
+}
+
 export default function DashboardSummary() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -75,7 +93,7 @@ export default function DashboardSummary() {
         <h3 className="text-lg font-semibold text-gray-700 mb-4">Produtos com Estoque Baixo</h3>
         {data.lowStockProducts.length > 0 ? (
           <div className="space-y-2">
-            {data.lowStockProducts.map((product: any) => (
+            {data.lowStockProducts.map((product: Product) => (
               <div key={product.id} className="flex justify-between items-center p-3 bg-yellow-50 rounded-md border border-yellow-200">
                 <span className="font-medium">{product.nome}</span>
                 <span className="text-sm bg-yellow-200 px-2 py-1 rounded">

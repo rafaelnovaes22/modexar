@@ -8,7 +8,8 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch suppliers' }, { status: 500 });
     }
     return NextResponse.json(data);
-  } catch (error) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -21,7 +22,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create supplier' }, { status: 500 });
     }
     return NextResponse.json(data[0], { status: 201 });
-  } catch (error) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

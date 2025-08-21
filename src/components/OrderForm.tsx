@@ -61,9 +61,13 @@ export default function OrderForm({ products }: { products: ProdutoComFornecedor
       formRef.current?.reset();
       closeModal();
 
-    } catch (err: any) {
+    } catch (err) {
       console.error('Falha ao criar pedido:', err);
-      setError(err.message || 'Não foi possível criar o pedido. Tente novamente.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Não foi possível criar o pedido. Tente novamente.');
+      }
     }
   }
 
