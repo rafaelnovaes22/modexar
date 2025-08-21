@@ -1,23 +1,17 @@
 -- Criar extensão UUID se não existir
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Criar o banco de dados (se executando como admin)
--- CREATE DATABASE marketplace_bras;
-
 -- Tabela de usuários/autenticação
 CREATE TABLE usuarios (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
-    senha_hash TEXT NOT NULL,
-    tipo TEXT DEFAULT 'lojista' CHECK (tipo IN ('lojista', 'fornecedor', 'admin')),
-    ativo BOOLEAN DEFAULT true,
-    criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    password TEXT NOT NULL, -- Armazena o hash da senha
+    created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- Tabela de fornecedores
 CREATE TABLE fornecedores (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    usuario_id UUID REFERENCES usuarios(id) ON DELETE CASCADE,
     nome TEXT NOT NULL,
     cnpj TEXT UNIQUE,
     contato_whatsapp TEXT,
@@ -56,18 +50,8 @@ CREATE TABLE pedidos (
     atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Tabela de sessões (para autenticação JWT)
-CREATE TABLE sessoes (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    usuario_id UUID REFERENCES usuarios(id) ON DELETE CASCADE,
-    token_hash TEXT NOT NULL,
-    expira_em TIMESTAMP WITH TIME ZONE NOT NULL,
-    criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- Índices para melhor performance
 CREATE INDEX idx_usuarios_email ON usuarios(email);
-CREATE INDEX idx_fornecedores_usuario ON fornecedores(usuario_id);
 CREATE INDEX idx_fornecedores_status ON fornecedores(status);
 CREATE INDEX idx_produtos_fornecedor ON produtos(fornecedor_id);
 CREATE INDEX idx_produtos_categoria ON produtos(categoria);
@@ -75,8 +59,6 @@ CREATE INDEX idx_produtos_ativo ON produtos(ativo);
 CREATE INDEX idx_pedidos_produto ON pedidos(produto_id);
 CREATE INDEX idx_pedidos_status ON pedidos(status);
 CREATE INDEX idx_pedidos_data ON pedidos(criado_em);
-CREATE INDEX idx_sessoes_usuario ON sessoes(usuario_id);
-CREATE INDEX idx_sessoes_expira ON sessoes(expira_em);
 
 -- Função para atualizar timestamp
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -113,4 +95,4 @@ SELECT
     f.contato_whatsapp as fornecedor_whatsapp
 FROM pedidos pe
 JOIN produtos pr ON pe.produto_id = pr.id
-JOIN fornecedores f ON pr.fornecedor_id = f.id; 
+JOIN fornecedores f ON pr.fornecedor_id = f.id;
