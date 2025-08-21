@@ -10,6 +10,9 @@ if (!SECRET_KEY) {
 
 const key = new TextEncoder().encode(SECRET_KEY);
 
+// Força o middleware a rodar no runtime do Node.js para compatibilidade de módulos
+export const runtime = 'nodejs';
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
