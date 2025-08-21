@@ -34,7 +34,11 @@ jobs:
       with:
         node-version: 20.x
         cache: 'npm'
-    - run: npm ci
+    
+    - name: Clean Install Dependencies
+      run: |
+        rm -rf node_modules package-lock.json
+        npm install
     
     # Instala o cliente do PostgreSQL para executar o script de setup
     - name: Install PostgreSQL client

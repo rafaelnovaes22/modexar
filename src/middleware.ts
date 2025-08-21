@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
+// Forçando a reavaliação do cache do Next.js
 const SECRET_KEY = process.env.JWT_SECRET_KEY;
 
 if (!SECRET_KEY) {
