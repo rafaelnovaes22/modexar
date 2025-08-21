@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('should navigate to the login page and display the form', async ({ page }) => {
   await page.goto('http://localhost:3000/login');
 
-  await expect(page.locator('h1')).toHaveText('Login');
+  await expect(page.locator('h1')).toHaveText('Acessar Painel');
 
   await expect(page.locator('label[for="email"]')).toHaveText('Email');
   await expect(page.locator('input#email')).toBeVisible();
