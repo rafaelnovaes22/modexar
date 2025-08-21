@@ -1,52 +1,18 @@
-'use client';
-
-import { useState } from 'react';
 import Link from 'next/link';
+import { signUp } from '@/lib/auth-server';
 
-export default function CadastroPage() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password !== confirmPassword) {
-      alert('As senhas não conferem!');
-      return;
-    }
-    // Lógica de cadastro com Supabase será implementada aqui
-    console.log('Name:', name);
-    console.log('Email:', email);
-    console.log('Password:', password);
-  };
-
+export default function CadastroPage({ searchParams }: { searchParams: { message: string } }) {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold text-center text-gray-900">Cadastro</h1>
-        <form onSubmit={handleRegister} className="space-y-6">
-          <div>
-            <label
-              htmlFor="name"
-              className="text-sm font-medium text-gray-700"
-            >
-              Nome
-            </label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
+        <h1 className="text-2xl font-bold text-center text-gray-900">Criar Conta</h1>
+        
+        {/* O formulário agora chama a Server Action diretamente */}
+        <form action={signUp} className="space-y-6">
           <div>
             <label
               htmlFor="email"
-              className="text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-700"
             >
               Email
             </label>
@@ -55,15 +21,14 @@ export default function CadastroPage() {
               name="email"
               type="email"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="seu@email.com"
             />
           </div>
           <div>
             <label
               htmlFor="password"
-              className="text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-700"
             >
               Senha
             </label>
@@ -72,28 +37,19 @@ export default function CadastroPage() {
               name="password"
               type="password"
               required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              minLength={6}
               className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="••••••••"
             />
           </div>
-          <div>
-            <label
-              htmlFor="confirmPassword"
-              className="text-sm font-medium text-gray-700"
-            >
-              Confirmar Senha
-            </label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
+          
+          {/* Exibe mensagens de erro/sucesso */}
+          {searchParams.message && (
+            <div className="p-4 text-center text-sm text-red-600 bg-red-50 rounded-md">
+              {searchParams.message}
+            </div>
+          )}
+
           <div>
             <button
               type="submit"
@@ -103,6 +59,7 @@ export default function CadastroPage() {
             </button>
           </div>
         </form>
+        
         <p className="text-sm text-center text-gray-600">
           Já tem uma conta?{' '}
           <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
