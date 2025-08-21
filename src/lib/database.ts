@@ -1,23 +1,27 @@
-import { createClient } from '@supabase/supabase-js';
+import { Pool } from 'pg';
 
-// Como próximo passo, devemos gerar os tipos TypeScript a partir do schema do Supabase
-// para obter segurança de tipos completa e autocomplete. Por enquanto, usaremos o cliente sem tipos customizados.
-// Veja a documentação do Supabase para gerar os tipos: https://supabase.com/docs/guides/database/api/generating-types
+// Cria um novo pool de conexões. O pool irá ler as variáveis de ambiente
+// (PGHOST, PGUSER, PGDATABASE, PGPASSWORD, PGPORT) ou a variável POSTGRES_URL.
+const pool = new Pool({
+  // Configuração recomendada para ambientes serverless como Vercel
+  max: 1, 
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
 
-// Variáveis de ambiente para configuração do Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-// Validação para garantir que as variáveis de ambiente foram configuradas
-if (!supabaseUrl) {
-  throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_URL');
+// Função para executar consultas SQL.
+export async function query(text: string, params?: any[]) {
+  const start = Date.now();
+  try {
+    const res = await pool.query(text, params);
+    const duration = Date.now() - start;
+    console.log('executed query', { text, duration, rows: res.rowCount });
+    return res;
+  } catch (error) {
+    console.error('Error executing query', { text, error });
+    throw error;
+  }
 }
 
-if (!supabaseAnonKey) {
-  throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY');
-}
-
-// Criação do cliente Supabase
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-export default supabase;
+// Exporta o pool caso seja necessário para transações ou outras operações específicas.
+export default pool;

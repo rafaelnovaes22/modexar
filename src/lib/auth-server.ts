@@ -1,89 +1,112 @@
-'use server';
-
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { Database } from '@/types/supabase';
+import { cookies } from 'next/headers';
+import { hash, compare } from 'bcryptjs';
+import { SignJWT } from 'jose';
+import { query } from './database';
 
-/**
- * Cria um cliente Supabase para uso em Server Components/Actions.
- * Ele é configurado para ler e escrever cookies, gerenciando a sessão do usuário.
- */
-function createSupabaseServerClient() {
-  const cookieStore = cookies();
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options) {
-          cookieStore.set({ name, value, ...options });
-        },
-        remove(name: string, options) {
-          cookieStore.set({ name, value: '', ...options });
-        },
-      },
-    }
-  );
+const SECRET_KEY = process.env.JWT_SECRET_KEY;
+const BCRYPT_SALT_ROUNDS = 10;
+
+if (!SECRET_KEY) {
+  throw new Error('JWT_SECRET_KEY is not set in environment variables');
 }
 
-/**
- * Realiza o cadastro de um novo usuário.
- * @param formData - Os dados do formulário contendo email e senha.
- */
+const key = new TextEncoder().encode(SECRET_KEY);
+
+// Função para criar um JWT
+async function createJwt(payload: { userId: string; email: string }) {
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('1h') // Token expira em 1 hora
+    .sign(key);
+}
+
+// Server Action para registro de usuário
 export async function signUp(formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
-  const supabase = createSupabaseServerClient();
 
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
-
-  if (error) {
-    console.error('Erro no cadastro:', error.message);
-    // Redireciona de volta para a página de cadastro com uma mensagem de erro
-    return redirect('/cadastro?message=Não foi possível realizar o cadastro.');
+  if (!email || !password) {
+    return redirect('/cadastro?message=Email e senha são obrigatórios.');
   }
 
-  // Redireciona para a página de login com uma mensagem de sucesso
+  try {
+    // Verifica se o usuário já existe
+    const existingUser = await query('SELECT * FROM usuarios WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      return redirect('/cadastro?message=Este email já está em uso.');
+    }
+
+    // Faz o hash da senha
+    const hashedPassword = await hash(password, BCRYPT_SALT_ROUNDS);
+
+    // Insere o novo usuário no banco de dados
+    const result = await query(
+      'INSERT INTO usuarios (email, password) VALUES ($1, $2) RETURNING id',
+      [email, hashedPassword]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('Falha ao registrar o usuário.');
+    }
+
+  } catch (error) {
+    console.error('SignUp Error:', error);
+    return redirect('/cadastro?message=Ocorreu um erro no servidor. Tente novamente.');
+  }
+
   return redirect('/login?message=Cadastro realizado com sucesso! Faça o login.');
 }
 
-/**
- * Realiza o login do usuário.
- * @param formData - Os dados do formulário contendo email e senha.
- */
+// Server Action para login de usuário
 export async function signIn(formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
-  const supabase = createSupabaseServerClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  if (!email || !password) {
+    return redirect('/login?message=Email e senha são obrigatórios.');
+  }
 
-  if (error) {
-    console.error('Erro no login:', error.message);
-    return redirect('/login?message=Email ou senha inválidos.');
+  try {
+    // Busca o usuário no banco de dados
+    const result = await query('SELECT id, email, password FROM usuarios WHERE email = $1', [email]);
+    const user = result.rows[0];
+
+    if (!user) {
+      return redirect('/login?message=Email ou senha inválidos.');
+    }
+
+    // Compara a senha fornecida com o hash salvo
+    const isPasswordValid = await compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return redirect('/login?message=Email ou senha inválidos.');
+    }
+
+    // Cria o token JWT
+    const token = await createJwt({ userId: user.id, email: user.email });
+
+    // Define o cookie de autenticação
+    cookies().set('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60, // 1 hora
+    });
+
+  } catch (error) {
+    console.error('SignIn Error:', error);
+    return redirect('/login?message=Ocorreu um erro no servidor. Tente novamente.');
   }
 
   // Redireciona para o dashboard em caso de sucesso
   return redirect('/dashboard');
 }
 
-/**
- * Realiza o logout do usuário.
- */
+// Server Action para logout
 export async function signOut() {
-  const supabase = createSupabaseServerClient();
-  await supabase.auth.signOut();
-  
-  // Redireciona para a página de login após o logout
-  return redirect('/login');
+  cookies().delete('auth_token');
+  redirect('/login');
 }

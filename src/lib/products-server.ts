@@ -1,58 +1,64 @@
-'use server';
+import { query } from './database';
+import { z } from 'zod';
+import type { Fornecedor } from './suppliers-server';
 
-import { supabase } from './database';
-import { Database } from '@/types/supabase';
-import { revalidatePath } from 'next/cache';
+// Validação com Zod
+const ProdutoSchema = z.object({
+  id: z.string().uuid().optional(),
+  nome: z.string().min(1, 'O nome é obrigatório.'),
+  descricao: z.string().nullable().optional(),
+  preco: z.number().positive('O preço deve ser um número positivo.'),
+  estoque: z.number().int().min(0, 'O estoque não pode ser negativo.'),
+  fornecedor_id: z.string().uuid('ID de fornecedor inválido.'),
+});
 
-// Tipos Helper
-export type Produto = Database['public']['Tables']['produtos']['Row'];
-export type NewProduto = Database['public']['Tables']['produtos']['Insert'];
+export type Produto = z.infer<typeof ProdutoSchema>;
+export type ProdutoComFornecedor = Produto & { fornecedores: Fornecedor | null };
 
-// Tipo para o produto com o nome do fornecedor (resultado do JOIN)
-export type ProdutoComFornecedor = Produto & {
-  fornecedores: {
-    nome: string;
-  } | null;
-};
+// Função para ler todos os produtos, incluindo dados do fornecedor
+export async function readProductsWithSuppliers() {
+  try {
+    const sql = `
+      SELECT 
+        p.*,
+        json_build_object(
+          'id', f.id,
+          'nome', f.nome
+        ) as fornecedor
+      FROM produtos p
+      LEFT JOIN fornecedores f ON p.fornecedor_id = f.id
+      ORDER BY p.nome ASC;
+    `;
+    const result = await query(sql);
+    
+    // Renomeia 'fornecedor' para 'fornecedores' para manter compatibilidade com o frontend
+    const products = result.rows.map(row => ({
+      ...row,
+      fornecedores: row.fornecedor,
+      fornecedor: undefined,
+    }));
 
-/**
- * Busca todos os produtos no banco de dados, incluindo o nome do fornecedor associado.
- * @returns Uma promessa que resolve para um array de produtos com dados do fornecedor.
- */
-export async function getProducts(): Promise<ProdutoComFornecedor[]> {
-  // O método .select() do Supabase permite fazer o JOIN de forma declarativa
-  const { data, error } = await supabase
-    .from('produtos')
-    .select(`
-      *,
-      fornecedores (
-        nome
-      )
-    `)
-    .order('criado_em', { ascending: false });
-
-  if (error) {
-    console.error('Erro ao buscar produtos:', error.message);
-    throw new Error('Não foi possível buscar os dados dos produtos.');
+    return { data: products, error: null };
+  } catch (error) {
+    console.error('Failed to fetch products with suppliers:', error);
+    return { data: null, error };
   }
-
-  return data || [];
 }
 
-/**
- * Adiciona um novo produto ao banco de dados.
- * @param productData - Os dados do novo produto.
- */
-export async function addProduct(productData: NewProduto) {
-  const { error } = await supabase
-    .from('produtos')
-    .insert(productData);
+// Função para adicionar um novo produto
+export async function addProduct(productData: Omit<Produto, 'id'>) {
+  try {
+    const validatedData = ProdutoSchema.omit({ id: true }).parse(productData);
+    const { nome, descricao, preco, estoque, fornecedor_id } = validatedData;
 
-  if (error) {
-    console.error('Erro ao adicionar produto:', error.message);
-    throw new Error('Não foi possível adicionar o novo produto.');
+    const result = await query(
+      'INSERT INTO produtos (nome, descricao, preco, estoque, fornecedor_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [nome, descricao, preco, estoque, fornecedor_id]
+    );
+    
+    return { data: result.rows, error: null };
+  } catch (error) {
+    console.error('Failed to add product:', error);
+    return { data: null, error };
   }
-
-  // Invalida o cache da página de produtos para que a lista seja atualizada
-  revalidatePath('/dashboard/produtos');
 }

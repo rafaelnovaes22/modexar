@@ -10,6 +10,23 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # Define um serviço de contêiner para o PostgreSQL
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        # Opção para garantir que o banco de dados esteja pronto
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - uses: actions/checkout@v3
     - name: Use Node.js 20.x
@@ -18,12 +35,32 @@ jobs:
         node-version: 20.x
         cache: 'npm'
     - run: npm ci
+    
+    # Instala o cliente do PostgreSQL para executar o script de setup
+    - name: Install PostgreSQL client
+      run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+    # Executa o script de setup do banco de dados
+    - name: Setup Database
+      run: psql $POSTGRES_URL -f ./database-setup.sql
+      env:
+        PGPASSWORD: password
+        POSTGRES_URL: postgresql://user:password@localhost:5432/testdb
+
     - run: npm run lint
     - run: npx playwright install --with-deps
     - run: rm -rf .next
-    - run: npm run test:e2e -- --reporter=list
+    
+    - name: Run E2E Tests
+      run: npm run test:e2e -- --reporter=list
       env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-    - run: npm run build --if-present
+        # Variáveis para a aplicação Next.js
+        POSTGRES_URL: postgresql://user:password@localhost:5432/testdb
+        JWT_SECRET_KEY: a-super-secret-key-for-ci-tests-that-is-long-enough
+
+    - name: Build Project
+      run: npm run build --if-present
+      env:
+        POSTGRES_URL: postgresql://user:password@localhost:5432/testdb
+        JWT_SECRET_KEY: a-super-secret-key-for-ci-tests-that-is-long-enough
 

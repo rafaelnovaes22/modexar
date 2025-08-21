@@ -1,66 +1,67 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+import { jwtVerify } from 'jose';
+
+const SECRET_KEY = process.env.JWT_SECRET_KEY;
+
+if (!SECRET_KEY) {
+  throw new Error('JWT_SECRET_KEY is not set in environment variables');
+}
+
+const key = new TextEncoder().encode(SECRET_KEY);
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+  const { pathname } = request.nextUrl;
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options) {
-          request.cookies.set({ name, value, ...options });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options) {
-          request.cookies.set({ name, value: '', ...options });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({ name, value: '', ...options });
-        },
-      },
-    }
-  );
+  // Rotas públicas que não exigem autenticação
+  const publicPaths = ['/login', '/cadastro'];
 
-  // Protege as rotas do dashboard
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
-    // Se não há sessão e o usuário tenta acessar o dashboard, redireciona para o login
+  // Se a rota for pública, não faz nada
+  if (publicPaths.includes(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Tenta obter o token do cookie
+  const tokenCookie = request.cookies.get('auth_token');
+
+  if (!tokenCookie) {
+    // Se não houver token, redireciona para o login
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    url.searchParams.set('message', 'Por favor, faça login para continuar.');
     return NextResponse.redirect(url);
   }
 
-  return response;
+  try {
+    // Verifica se o token JWT é válido
+    await jwtVerify(tokenCookie.value, key);
+    
+    // Se o token for válido, permite o acesso à rota solicitada
+    return NextResponse.next();
+
+  } catch (error) {
+    // Se o token for inválido ou expirado, redireciona para o login
+    console.error('JWT Verification Error:', error);
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('message', 'Sua sessão expirou. Faça login novamente.');
+    
+    // Deleta o cookie inválido
+    const response = NextResponse.redirect(url);
+    response.cookies.delete('auth_token');
+    return response;
+  }
 }
 
-// Configuração do matcher para definir quais rotas o middleware deve rodar
+// Configuração do matcher para definir quais rotas o middleware deve proteger
 export const config = {
   matcher: [
     /*
      * Corresponde a todas as rotas, exceto as que começam com:
+     * - api (rotas de API)
      * - _next/static (arquivos estáticos)
      * - _next/image (otimização de imagem)
-     * - favicon.ico (ícone do site)
-     * Isso evita que o middleware rode em requisições desnecessárias.
+     * - favicon.ico (ícone)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 };

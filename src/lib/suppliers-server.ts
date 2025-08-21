@@ -1,94 +1,45 @@
-'use server';
+import { query } from './database';
+import { z } from 'zod';
 
-import { supabase } from './database';
-import { Database } from '@/types/supabase';
-import { revalidatePath } from 'next/cache';
+// Validação com Zod para garantir a integridade dos dados
+const FornecedorSchema = z.object({
+  id: z.string().uuid().optional(),
+  nome: z.string().min(1, 'O nome é obrigatório.'),
+  cnpj: z.string().nullable().optional(),
+  contato_whatsapp: z.string().nullable().optional(),
+  email: z.string().email('Email inválido.').nullable().optional(),
+  endereco: z.string().nullable().optional(),
+});
 
-// Definindo um tipo helper para facilitar
-export type Fornecedor = Database['public']['Tables']['fornecedores']['Row'];
-type NewFornecedor = Database['public']['Tables']['fornecedores']['Insert'];
+export type Fornecedor = z.infer<typeof FornecedorSchema>;
 
-/**
- * Busca todos os fornecedores no banco de dados.
- * @returns Uma promessa que resolve para um array de fornecedores.
- */
-export async function getSuppliers(): Promise<Fornecedor[]> {
-  const { data, error } = await supabase
-    .from('fornecedores')
-    .select('*')
-    .order('criado_em', { ascending: false });
-
-  if (error) {
-    console.error('Erro ao buscar fornecedores:', error.message);
-    throw new Error('Não foi possível buscar os dados dos fornecedores.');
+// Função para ler todos os fornecedores
+export async function readSuppliers() {
+  try {
+    const result = await query('SELECT * FROM fornecedores ORDER BY nome ASC');
+    return { data: result.rows, error: null };
+  } catch (error) {
+    console.error('Failed to fetch suppliers:', error);
+    return { data: null, error };
   }
-
-  return data || [];
 }
 
-/**
- * Adiciona um novo fornecedor ao banco de dados.
- * @param supplierData - Os dados do novo fornecedor.
- * @returns Uma promessa que resolve para o fornecedor recém-criado.
- */
-export async function addSupplier(supplierData: NewFornecedor): Promise<Fornecedor> {
-  const { data, error } = await supabase
-    .from('fornecedores')
-    .insert(supplierData)
-    .select()
-    .single(); // .single() retorna o objeto inserido em vez de um array
+// Função para criar um novo fornecedor
+export async function createSupplier(supplierData: Omit<Fornecedor, 'id'>) {
+  try {
+    // Valida os dados antes de inserir
+    const validatedData = FornecedorSchema.omit({ id: true }).parse(supplierData);
 
-  if (error) {
-    console.error('Erro ao adicionar fornecedor:', error.message);
-    // Poderíamos tratar erros específicos aqui, como CNPJ duplicado
-    throw new Error('Não foi possível adicionar o novo fornecedor.');
+    const { nome, cnpj, contato_whatsapp, email, endereco } = validatedData;
+
+    const result = await query(
+      'INSERT INTO fornecedores (nome, cnpj, contato_whatsapp, email, endereco) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [nome, cnpj, contato_whatsapp, email, endereco]
+    );
+    
+    return { data: result.rows, error: null };
+  } catch (error) {
+    console.error('Failed to create supplier:', error);
+    return { data: null, error };
   }
-
-  // Invalida o cache da página de fornecedores para que a lista seja atualizada
-  revalidatePath('/dashboard/fornecedores');
-
-  return data;
-}
-
-/**
- * Atualiza os dados de um fornecedor existente.
- * @param id - O UUID do fornecedor a ser atualizado.
- * @param updatedData - Os campos a serem atualizados.
- * @returns Uma promessa que resolve para o fornecedor atualizado.
- */
-export async function updateSupplier(id: string, updatedData: Partial<NewFornecedor>): Promise<Fornecedor> {
-    const { data, error } = await supabase
-        .from('fornecedores')
-        .update(updatedData)
-        .eq('id', id)
-        .select()
-        .single();
-
-    if (error) {
-        console.error('Erro ao atualizar fornecedor:', error.message);
-        throw new Error('Não foi possível atualizar o fornecedor.');
-    }
-
-    revalidatePath('/dashboard/fornecedores');
-    revalidatePath(`/dashboard/fornecedores/${id}`); // Invalida a página de detalhes também, se houver
-
-    return data;
-}
-
-/**
- * Deleta um fornecedor do banco de dados.
- * @param id - O UUID do fornecedor a ser deletado.
- */
-export async function deleteSupplier(id: string): Promise<void> {
-    const { error } = await supabase
-        .from('fornecedores')
-        .delete()
-        .eq('id', id);
-
-    if (error) {
-        console.error('Erro ao deletar fornecedor:', error.message);
-        throw new Error('Não foi possível deletar o fornecedor.');
-    }
-
-    revalidatePath('/dashboard/fornecedores');
 }
